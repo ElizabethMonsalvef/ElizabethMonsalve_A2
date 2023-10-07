@@ -1,0 +1,109 @@
+---
+title: "KNN, Linear regression, and multilinear regression"
+author: "Elizabeth Daniela Monsalve Forero"
+date: "2023-10-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message = FALSE}
+library(tidyverse)
+library(caret)
+library(MASS)
+library(glmnet)
+library(boot)
+```
+
+This code block loads a number of packages in R, allowing the functions and tools provided by those packages to be used in data analysis. Each package has its own set of functionality:
+
+1) caret (Classification and Regression Training): provides a unified set of functions and tools for training and evaluating supervised machine learning models. It facilitates the construction of classification and regression models by providing a common interface for many machine learning algorithms.
+
+2) MASS (Modern Applied Statistics with S): Contains a wide variety of functions and data sets commonly used in applied statistics. It includes advanced statistical methods and functions for fitting linear models, logistic regression, discriminant analysis, among others.
+
+3) glmnet: is a library used for fitting linear and logistic regression models with L1 and L2 regularization (lasso and ridge, respectively). 
+
+4) boot: It is used to perform resampling analysis and construction of confidence intervals using the bootstrapping technique. This library is useful to perform robust statistical inference and to evaluate uncertainty in parameter estimates and statistics.
+
+```{r}
+data <- read.csv("diabetes_012_health_indicators_BRFSS2015.csv")
+```
+
+This line of code reads the database CSV file (diabetes_012_health_indicators_BRFSS2015) in R and loads its data into an object called data
+
+```{r}
+set.seed(150)
+sample <- data %>% sample_frac(0.01)
+sample$Binary <- make.names(factor(ifelse(sample$Diabetes_012 > 0, 1, 0)))
+sample$Binary <- factor(sample$Binary, levels = c("X0", "X1"))
+```
+
+First, a seed is set for the random number generator in R. By setting a specific seed (in this case, 150), the random numbers generated in subsequent operations will be the same each time the code is run, which facilitates the reproducibility of the analysis. 
+
+Subsequently, a random sample of 1% of the original data is selected and stored in a new object called ¨sample¨, a column called Diabetes_012 is binarized depending on whether the values are greater than 0, and then a new categorical variable called Binary is created with levels "N0" and "S1" representing the presence or absence of diabetes.
+
+
+```{r}
+BMI <- sample
+Menthlth <- sample
+Physhtlth <- sample
+```
+
+3 new data vectors are created from the original ¨sample¨ dataset.
+
+```{r}
+set.seed(150) 
+Index <- createDataPartition(sample$Binary, p = 0.8, list = FALSE, times = 1)
+Data <- sample[Index, ]
+Test <- sample[-Index, ]
+```
+
+This code block divides the data into a training set ¨Data¨ and a test set ¨Test¨ using the createDataPartition function, subsequently, it is specified that 80% of the data will be used to train models and 20% to evaluate their performance. 
+
+```{r}
+Control <- trainControl(method = "cv", number = 10, classProbs = TRUE, summaryFunction = twoClassSummary)
+```
+
+
+This line of code is setting up a control variable called ¨Control¨ that will be used when training and evaluating a classification model. The ¨Control¨ object specifies that a 10-fold cross-validation will be performed, classification probabilities will be generated, and the twoClassSummary function will be used to summarize the results of the model evaluation.
+
+```{r}
+set.seed(20)
+KNN <- train(Binary ~ ., data = Data, method = "knn", trControl = Control, tuneLength = 10)
+print(KNN)
+predictions <- predict(KNN, newdata = Test)
+confusionMatrix(predictions, Test$Binary)
+```
+
+This code block is a complete process from initial setup to final evaluation of the KNN model:
+
+1) Setting the Random Seed: Setting a random seed means that, although the KNN model uses randomness in its process, the results will be consistent in every execution of the code.
+
+2) Training the KNN Model: The train() function is used to predict the binary variable "Binary" using all the other variables in the Data training dataset.
+
+3) Parameter tuning: A parameter search is performed by testing different values of "k" in the range of 1 to 10. This is done using cross-validation, which means that the dataset is split into parts to evaluate the performance of the model with different values of "k". The goal is to find the optimal value of "k" that provides the best performance on the training dataset.
+
+3) Model Evaluation: After training the KNN model with the optimal value of "k", the ¨Test¨ data is used to make predictions. These predictions are compared with the actual ¨Test¨ class labels to compute a confusion matrix. The confusion matrix shows the number of true positives, true negatives, false positives and false negatives.
+
+```{r}
+BMI2 <- lm(BMI ~ ., data = BMI)
+BMI_results <- cv.glm(data = BMI, glmfit = BMI2, K = 10)
+
+Menthlth2 <- lm(MentHlth ~ ., data = Menthlth)
+Menthlth_results <- cv.glm(data = Menthlth, glmfit = Menthlth2, K = 10)
+
+Physhtlth2 <- lm(PhysHlth ~ ., data = Physhtlth)
+Physhtlth_results <- cv.glm(data = Physhtlth, glmfit = Physhtlth2, K = 10)
+
+```
+
+This code is used to fit linear regression models and evaluate their performance using cross-validation on three different data sets ("BMI", "MentHlth" and "PhysHlth"). It helps to determine how well the model fits the data and how well it generalizes to new data.
+
+1) Linear Regression: A linear regression model is being fitted where the dependent variables are: "BMI", "MentHlth" and "PhysHlth" and each set is used as the data source. The symbol ~ . means that all other variables are being used as independent variables to predict the dependent variable.
+
+2) Cross Validation: Cross validation is performed (in this case, with 10 folds) to evaluate the performance of the fitted linear regression model for the dependent variables. The function cv.glm() takes as arguments the data set, the fitted model and the number of folds (K = 10) for cross-validation. This evaluates how well the model generalizes to unseen data and returns cross-validation results.
+
+
+
